@@ -1,98 +1,971 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+Skip to content
+Chat history
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+You said:
+Nest crud example step
+ChatGPT said:
+Below is a simple NestJS CRUD example – step by step 👍
+I’ll use a Users resource with Nest CLI + in-memory array first (easy to understand).
+At the end, I’ll also show how it looks with a database (TypeORM).
 
-## Description
+1️⃣ Create a NestJS Project
+npm i -g @nestjs/cli
+nest new nest-crud
+cd nest-crud
+npm run start:dev
+2️⃣ Generate CRUD Resource
+Nest can scaffold everything for you:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+nest g resource users
+Choose:
 
-## Project setup
+Transport: REST API
 
-```bash
-$ npm install
-```
+CRUD entry points: Yes
 
-## Compile and run the project
+This creates:
 
-```bash
-# development
-$ npm run start
+users/
+ ├── dto/
+ ├── entities/
+ ├── users.controller.ts
+ ├── users.service.ts
+ ├── users.module.ts
+3️⃣ User Entity (Model)
+users/entities/user.entity.ts
 
-# watch mode
-$ npm run start:dev
+export class User {
+  id: number;
+  name: string;
+  email: string;
+}
+4️⃣ DTOs (Data Transfer Objects)
+Create DTO
+users/dto/create-user.dto.ts
 
-# production mode
-$ npm run start:prod
-```
+export class CreateUserDto {
+  name: string;
+  email: string;
+}
+Update DTO
+users/dto/update-user.dto.ts
 
-## Run tests
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateUserDto } from './create-user.dto';
 
-```bash
-# unit tests
-$ npm run test
+export class UpdateUserDto extends PartialType(CreateUserDto) {}
+5️⃣ Service (Business Logic)
+users/users.service.ts
 
-# e2e tests
-$ npm run test:e2e
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { User } from './entities/user.entity';
 
-# test coverage
-$ npm run test:cov
-```
+@Injectable()
+export class UsersService {
+  private users: User[] = [];
+  private id = 1;
 
-## Deployment
+  create(createUserDto: CreateUserDto): User {
+    const user: User = {
+      id: this.id++,
+      ...createUserDto,
+    };
+    this.users.push(user);
+    return user;
+  }
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+  findAll(): User[] {
+    return this.users;
+  }
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+  findOne(id: number): User {
+    const user = this.users.find(u => u.id === id);
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+  update(id: number, updateUserDto: UpdateUserDto): User {
+    const user = this.findOne(id);
+    Object.assign(user, updateUserDto);
+    return user;
+  }
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+  remove(id: number): string {
+    this.users = this.users.filter(u => u.id !== id);
+    return 'User deleted';
+  }
+}
+6️⃣ Controller (Routes)
+users/users.controller.ts
 
-## Resources
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
-Check out a few resources that may come in handy when working with NestJS:
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+  @Post()
+  create(@Body() dto: CreateUserDto) {
+    return this.usersService.create(dto);
+  }
 
-## Support
+  @Get()
+  findAll() {
+    return this.usersService.findAll();
+  }
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(+id);
+  }
 
-## Stay in touch
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.usersService.update(+id, dto);
+  }
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.usersService.remove(+id);
+  }
+}
+7️⃣ Test APIs (Postman / Curl)
+➕ Create User
+POST /users
+{
+  "name": "Bini",
+  "email": "bini@test.com"
+}
+📄 Get All Users
+GET /users
+🔍 Get One User
+GET /users/1
+✏️ Update User
+PATCH /users/1
+{
+  "name": "Updated Name"
+}
+❌ Delete User
+DELETE /users/1
+8️⃣ CRUD with Database (TypeORM – Short Version)
+Install
+npm i @nestjs/typeorm typeorm mysql2
+app.module.ts
+TypeOrmModule.forRoot({
+  type: 'mysql',
+  host: 'localhost',
+  port: 3306,
+  username: 'root',
+  password: 'password',
+  database: 'test',
+  autoLoadEntities: true,
+  synchronize: true,
+})
+User Entity
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
-## License
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+  @Column()
+  name: string;
+
+  @Column({ unique: true })
+  email: string;
+}
+Inject Repository
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private repo: Repository<User>,
+  ) {}
+
+  create(dto: CreateUserDto) {
+    return this.repo.save(dto);
+  }
+
+  findAll() {
+    return this.repo.find();
+  }
+}
+🔑 Key Nest CRUD Concepts
+Controller → handles routes
+
+Service → business logic
+
+DTO → request validation & structure
+
+Entity → database model
+
+Module → groups everything
+
+If you want:
+
+✅ Validation with class-validator
+
+✅ MongoDB CRUD
+
+✅ Auth + CRUD
+
+✅ Advanced pagination & filtering
+
+Tell me which one 👍
+
+You said:
+waht is this for DTOs (Data Transfer Objects)
+ChatGPT said:
+DTO (Data Transfer Object) is a class used to define the shape of data that is sent from client → server (request) or server → client (response).
+
+In NestJS, DTOs are mainly used for:
+✅ Validation
+✅ Type safety
+✅ Clean & secure APIs
+
+🔹 Why DTOs are needed?
+Without DTO:
+
+@Post()
+create(@Body() body: any) {
+  return this.usersService.create(body);
+}
+❌ Problems:
+
+Accepts any extra fields
+
+No validation
+
+Easy to send invalid / malicious data
+
+Hard to maintain
+
+🔹 What DTO does?
+With DTO:
+
+@Post()
+create(@Body() createUserDto: CreateUserDto) {
+  return this.usersService.create(createUserDto);
+}
+✔ Only allowed fields
+✔ Validates input
+✔ Strong typing
+✔ Cleaner code
+
+🔹 Example DTO in NestJS
+📦 CreateUserDto
+export class CreateUserDto {
+  name: string;
+  email: string;
+}
+Client must send:
+
+{
+  "name": "Bini",
+  "email": "bini@test.com"
+}
+If client sends extra field:
+
+{
+  "name": "Bini",
+  "email": "bini@test.com",
+  "role": "admin"
+}
+👉 That field can be blocked using validation.
+
+🔹 DTO with Validation (Real Use Case)
+Install validation
+npm i class-validator class-transformer
+Enable globally
+// main.ts
+app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true,        // removes extra fields
+    forbidNonWhitelisted: true, // throws error for extra fields
+  }),
+);
+DTO with decorators
+import { IsString, IsEmail, IsNotEmpty } from 'class-validator';
+
+export class CreateUserDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsEmail()
+  email: string;
+}
+❌ Invalid request:
+
+{ "email": "not-an-email" }
+✅ Response:
+
+{
+  "statusCode": 400,
+  "message": ["email must be an email"],
+  "error": "Bad Request"
+}
+🔹 Update DTO (Partial Data)
+Update doesn’t require all fields.
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateUserDto } from './create-user.dto';
+
+export class UpdateUserDto extends PartialType(CreateUserDto) {}
+Allows:
+
+{
+  "name": "Updated Name"
+}
+🔹 DTO vs Entity (Very Important)
+DTO	Entity
+API input/output	Database structure
+Validation rules	Database rules
+Can change freely	Represents table
+Security layer	Persistence layer
+🚫 Never expose Entity directly in APIs
+
+🔹 DTO Flow in NestJS
+Client Request
+   ↓
+DTO (validate & transform)
+   ↓
+Controller
+   ↓
+Service
+   ↓
+Entity / DB
+🔹 Simple Definition (Interview-ready)
+DTO is a class that defines how data is transferred between client and server. It helps with validation, security, and maintaining clean APIs.
+
+If you want, I can explain:
+
+DTO vs Interface
+
+Request DTO vs Response DTO
+
+DTO validation in depth
+
+DTO best practices for enterprise apps
+
+Just tell me 👍
+
+You said:
+Cannot find module '@nestjs/mapped-types' or its corresponding type declarations.
+ChatGPT said:
+This is a common NestJS error 👍
+It simply means the package @nestjs/mapped-types is not installed.
+
+✅ Fix (Recommended)
+Install the missing package:
+
+npm install @nestjs/mapped-types
+or if you use yarn:
+
+yarn add @nestjs/mapped-types
+Then restart your server:
+
+npm run start:dev
+📌 Why this happens
+You’re using:
+
+import { PartialType } from '@nestjs/mapped-types';
+PartialType does NOT come by default with Nest core.
+It lives in a separate package: @nestjs/mapped-types.
+
+🧠 What is @nestjs/mapped-types used for?
+It helps you reuse DTOs instead of rewriting them.
+
+Example:
+
+export class UpdateUserDto extends PartialType(CreateUserDto) {}
+✔ Makes all fields optional
+✔ Avoids duplicate DTO code
+✔ Cleaner & scalable
+
+🔁 Alternative (Without mapped-types)
+If you don’t want to install it, you can write manually:
+
+export class UpdateUserDto {
+  name?: string;
+  email?: string;
+}
+⚠️ Not recommended for large apps.
+
+🔍 Version Compatibility Check
+If error still exists, ensure versions match:
+
+npm list @nestjs/common
+npm list @nestjs/mapped-types
+They should be on same major version (e.g. both v10).
+
+✅ Summary
+❌ Error → package missing
+
+✅ Fix → npm install @nestjs/mapped-types
+
+💡 Used for → PartialType, PickType, OmitType
+
+If you want, I can also explain:
+
+PickType vs OmitType
+
+DTO inheritance best practices
+
+NestJS v9/v10 differences
+
+Just tell me 🙂
+
+You said:
+@Body() maening
+ChatGPT said:
+@Body() is a NestJS decorator used to read data from the HTTP request body.
+
+🔹 What does @Body() do?
+It extracts the JSON body sent by the client and makes it available inside your controller method.
+
+@Post()
+create(@Body() body: any) {
+  console.log(body);
+}
+Request
+POST /users
+Content-Type: application/json
+
+{
+  "name": "Bini",
+  "email": "bini@test.com"
+}
+body value
+{
+  name: "Bini",
+  email: "bini@test.com"
+}
+🔹 Most common usage (with DTO)
+@Post()
+create(@Body() createUserDto: CreateUserDto) {
+  return this.usersService.create(createUserDto);
+}
+✔ Automatically maps request body to DTO
+✔ Enables validation
+✔ Strong typing
+
+🔹 @Body() vs @Body('field')
+Get full body
+@Body() dto: CreateUserDto
+Get single field
+@Body('email') email: string
+Example:
+
+@Post('login')
+login(@Body('email') email: string, @Body('password') password: string) {
+  return { email, password };
+}
+🔹 Why use @Body() instead of req.body?
+Without decorator:
+
+create(@Req() req) {
+  return req.body;
+}
+With decorator:
+
+create(@Body() dto: CreateUserDto) {
+  return dto;
+}
+Advantages
+@Body()	req.body
+Cleaner	Verbose
+Works with DTO validation	No auto-validation
+Framework-idiomatic	Express-specific
+Test-friendly	Less testable
+🔹 @Body() + Validation Pipe (Important)
+When used with DTO + ValidationPipe:
+
+@Body() createUserDto: CreateUserDto
+NestJS will:
+
+Transform JSON → DTO instance
+
+Validate fields
+
+Reject invalid requests automatically
+
+🔹 Related decorators (Interview tip)
+Decorator	Purpose
+@Body()	Request body
+@Param()	URL params
+@Query()	Query string
+@Headers()	Request headers
+@Req()	Full request
+@Res()	Full response
+🔹 One-line definition (Interview ready)
+@Body() extracts and validates the HTTP request body in NestJS controller methods.
+
+If you want, I can explain:
+
+@Body() lifecycle
+
+How validation works internally
+
+@Req() vs decorators
+
+How to handle multipart/form-data
+
+Just tell me 👍
+
+You said:
+what is this line doing  Object.assign(user, updateUserDto);
+ChatGPT said:
+This line:
+
+Object.assign(user, updateUserDto);
+copies all properties from updateUserDto into user (overwriting existing values).
+
+🔹 What exactly happens?
+Example values
+const user = {
+  id: 1,
+  name: 'Bini',
+  email: 'bini@test.com',
+};
+
+const updateUserDto = {
+  name: 'Updated Name',
+};
+After Object.assign
+Object.assign(user, updateUserDto);
+Result
+user = {
+  id: 1,
+  name: 'Updated Name',   // updated
+  email: 'bini@test.com' // unchanged
+};
+✔ Only fields present in updateUserDto are updated
+✔ Missing fields stay as-is
+
+🔹 Why is this used in CRUD update?
+In update APIs (PATCH):
+
+Client sends partial data
+
+You want to update only those fields
+
+Avoid writing multiple if conditions
+
+Without Object.assign:
+
+if (dto.name) user.name = dto.name;
+if (dto.email) user.email = dto.email;
+With Object.assign:
+
+Object.assign(user, dto);
+Clean & scalable ✔
+
+🔹 How it works internally
+Object.assign(target, source)
+target → object to update
+
+source → object containing new values
+
+Returns the updated target
+
+🔹 Important Note ⚠️
+If updateUserDto contains undefined, it will overwrite values:
+
+Object.assign(user, { name: undefined });
+Result:
+
+{ name: undefined }
+🔐 How to avoid this?
+Use validation + PartialType:
+
+export class UpdateUserDto extends PartialType(CreateUserDto) {}
+And enable validation pipe:
+
+whitelist: true
+🔹 Alternative modern syntax (same effect)
+Object.assign(user, updateUserDto);
+
+// or
+user = { ...user, ...updateUserDto };
+⚠️ Spread creates a new object, Object.assign mutates existing one.
+
+🔹 Why mutation matters in NestJS / ORM
+With TypeORM:
+
+const user = await repo.findOneBy({ id });
+Object.assign(user, dto);
+await repo.save(user);
+✔ ORM tracks changes correctly
+
+🔹 Interview-ready explanation
+Object.assign(user, updateUserDto) updates an existing object by copying only the provided fields from the update DTO, making it ideal for PATCH operations.
+
+If you want, I can explain:
+
+PATCH vs PUT
+
+DTO update patterns
+
+Object.assign vs spread vs lodash
+
+How ORMs track changes
+
+Just tell me 👍
+
+You said:
+@Param  meaning
+ChatGPT said:
+@Param() is a NestJS decorator used to read route (URL) parameters from the incoming HTTP request.
+
+🔹 What does @Param() do?
+It extracts values from dynamic parts of the URL.
+
+@Get(':id')
+findOne(@Param() params) {
+  return params;
+}
+Request
+GET /users/10
+params value
+{ id: '10' }
+🔹 Most common usage
+Get a single parameter
+@Get(':id')
+findOne(@Param('id') id: string) {
+  return id;
+}
+➡️ id = "10" (always string)
+
+🔹 Convert param to number
+URL params are strings by default.
+
+findOne(@Param('id') id: string) {
+  return this.usersService.findOne(+id);
+}
+or better (recommended):
+
+import { ParseIntPipe } from '@nestjs/common';
+
+findOne(@Param('id', ParseIntPipe) id: number) {
+  return this.usersService.findOne(id);
+}
+🔹 Multiple route params
+@Get(':userId/posts/:postId')
+getPost(
+  @Param('userId') userId: string,
+  @Param('postId') postId: string,
+) {
+  return { userId, postId };
+}
+🔹 @Param() vs @Query()
+Decorator	Source
+@Param()	URL path /users/:id
+@Query()	Query string ?page=1
+Example:
+
+/users/5?page=2
+@Param('id') id: string
+@Query('page') page: string
+🔹 Why use @Param() instead of req.params?
+// ❌ Express-style
+findOne(@Req() req) {
+  return req.params.id;
+}
+
+// ✅ Nest way
+findOne(@Param('id') id: string) {
+  return id;
+}
+✔ Cleaner
+✔ Type-safe
+✔ Easy validation with pipes
+
+🔹 Validation with @Param()
+@Get(':id')
+findOne(@Param('id', ParseIntPipe) id: number) {
+  return id;
+}
+Invalid request:
+
+GET /users/abc
+Response:
+
+{
+  "statusCode": 400,
+  "message": "Validation failed (numeric string is expected)",
+  "error": "Bad Request"
+}
+🔹 Common NestJS param decorators
+Decorator	Purpose
+@Param()	URL params
+@Query()	Query params
+@Body()	Request body
+@Headers()	Headers
+🔹 One-line definition (Interview ready)
+@Param() extracts dynamic route parameters from the request URL in NestJS.
+
+If you want, I can also explain:
+
+Pipes with @Param
+
+Custom param validation
+
+PUT vs PATCH with params
+
+REST URL best practices
+
+Just tell me 👍
+
+
+
+
+No file chosenNo file chosen
+ChatGPT can make mistakes. Check important info. See Cookie Preferences.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+✅ NestJS + TypeORM + MySQL (User CRUD – Full Example)
+1️⃣ Create Project
+nest new nest-mysql-user
+cd nest-mysql-user
+npm run start:dev
+
+2️⃣ Install Required Packages
+npm install @nestjs/typeorm typeorm mysql2
+npm install class-validator class-transformer
+
+3️⃣ Configure TypeORM (MySQL)
+📄 app.module.ts
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersModule } from './users/users.module';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'mysql',
+      host: 'localhost',
+      port: 3306,
+      username: 'root',
+      password: 'password',
+      database: 'nest_db',
+      autoLoadEntities: true,
+      synchronize: true, // ❗ disable in production
+    }),
+    UsersModule,
+  ],
+})
+export class AppModule {}
+
+4️⃣ Generate Users Module
+nest g resource users
+
+
+Choose:
+
+REST API
+
+Yes for CRUD
+
+5️⃣ User Entity (Database Table)
+📄 users/entities/user.entity.ts
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+
+@Entity('users')
+export class User {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  name: string;
+
+  @Column({ unique: true })
+  email: string;
+
+  @Column({ nullable: true })
+  age: number;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}
+
+6️⃣ DTOs (Validation Layer)
+📄 create-user.dto.ts
+import { IsEmail, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
+
+export class CreateUserDto {
+  @IsNotEmpty()
+  name: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @IsNumber()
+  age?: number;
+}
+
+📄 update-user.dto.ts
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateUserDto } from './create-user.dto';
+
+export class UpdateUserDto extends PartialType(CreateUserDto) {}
+
+7️⃣ Users Service (Business Logic)
+📄 users.service.ts
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+  ) {}
+
+  async create(dto: CreateUserDto): Promise<User> {
+    const user = this.userRepo.create(dto);
+    return this.userRepo.save(user);
+  }
+
+  async findAll(): Promise<User[]> {
+    return this.userRepo.find();
+  }
+
+  async findOne(id: number): Promise<User> {
+    const user = await this.userRepo.findOneBy({ id });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async update(id: number, dto: UpdateUserDto): Promise<User> {
+    const user = await this.findOne(id);
+    Object.assign(user, dto);
+    return this.userRepo.save(user);
+  }
+
+  async remove(id: number) {
+    const user = await this.findOne(id);
+    await this.userRepo.remove(user);
+    return { message: 'User deleted successfully' };
+  }
+}
+
+8️⃣ Users Controller (API Layer)
+📄 users.controller.ts
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Post()
+  create(@Body() dto: CreateUserDto) {
+    return this.usersService.create(dto);
+  }
+
+  @Get()
+  findAll() {
+    return this.usersService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.findOne(id);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.usersService.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.remove(id);
+  }
+}
+
+9️⃣ Users Module
+📄 users.module.ts
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { User } from './entities/user.entity';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([User])],
+  controllers: [UsersController],
+  providers: [UsersService],
+})
+export class UsersModule {}
+
+🔟 Enable Validation Globally
+📄 main.ts
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  await app.listen(3000);
+}
+bootstrap();
+
+🔥 API Endpoints
+Method	Endpoint	Description
+POST	/users	Create user
+GET	/users	Get all users
+GET	/users/:id	Get user by ID
+PATCH	/users/:id	Update user
+DELETE	/users/:id	Delete user
