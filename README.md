@@ -1113,3 +1113,73 @@ Interview-friendly ✔
 Interview answer ⭐
 
 DTOs in NestJS act as a validation and transformation layer, ensuring only valid and expected data enters the service layer.
+
+
+
+
+Why entity file is IMPORTANT
+✅ 1. Database schema definition
+
+Instead of writing SQL manually:
+
+CREATE TABLE users (...)
+
+
+You define schema in TypeScript.
+
+✅ 2. Used by TypeORM to generate tables
+
+With:
+
+synchronize: true
+
+
+TypeORM reads this entity and creates/updates the table automatically.
+
+✅ 3. Enables Repository API
+
+Without entity → repository cannot exist.
+
+@InjectRepository(User)
+private repo: Repository<User>;
+
+✅ 4. Type safety
+
+Your DB rows become typed objects:
+
+const user: User = await repo.findOne({ where: { id: 1 } });
+
+✅ 5. Clean separation of concerns
+Layer	Responsibility
+Entity	DB structure
+DTO	Request validation
+Service	Business logic
+Controller	HTTP handling
+Entity vs DTO (VERY IMPORTANT)
+Entity	DTO
+Represents DB table	Represents request body
+Contains DB columns	Contains only input fields
+Used by TypeORM	Used by Controller
+Has decorators like @Column	Has validation decorators
+
+❌ Never use entity as DTO
+
+Where entity is used in NestJS
+Entity
+  ↓
+TypeOrmModule.forFeature([User])
+  ↓
+Repository<User>
+  ↓
+Service
+
+What happens if you don’t use entity?
+
+❌ No table mapping
+❌ No repository
+❌ No ORM features
+❌ Manual SQL everywhere
+
+Interview summary ⭐
+
+The entity file defines the database table structure and enables TypeORM to map database rows to TypeScript objects, providing schema, constraints, and ORM features.
