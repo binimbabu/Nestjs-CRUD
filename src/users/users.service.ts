@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { QueryUserDto } from './dto/query-user.dto';
 
 
 
@@ -19,6 +20,11 @@ export class UsersService {
     ){}
 
  async create(createUserDTO: CreateUserDto) : Promise<User>{
+    var existingUser = await this.repo.findOne({ where: {email : createUserDTO.email}});
+    if(existingUser) 
+        {
+         throw new ConflictException("User exist already")
+        }
     var user = this.repo.create(createUserDTO);
     return this.repo.save(user);
 }
@@ -46,6 +52,28 @@ async updateUser(id:number, updateUserDto: UpdateUserDto) : Promise<User>{
     Object.assign(user, updateUserDto);
     return await this.repo.save(user);
 }
+
+async findAllQuery(query: QueryUserDto){
+   const { page = 1, limit = 10, search} = query;
+   const skip = (page-1) * limit;
+
+   const qb = this.repo.createQueryBuilder('user');
+   if(search){
+    qb.where('user.name LIKE :search OR user.email LIKE :search', { search : `%${search}%` });
+   }
+   const [ data, total ]  = await qb.skip(skip).take(limit).orderBy('user.createdAt', 'DESC').getManyAndCount();
+
+   return {
+    data,
+    meta : {
+        page,
+        total,
+        limit,
+        totalPages: Math.ceil(total/limit)
+    }
+   }
+}
+
 
 
     //with postman
