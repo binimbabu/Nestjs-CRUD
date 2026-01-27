@@ -1183,3 +1183,545 @@ What happens if you don’t use entity?
 Interview summary ⭐
 
 The entity file defines the database table structure and enables TypeORM to map database rows to TypeScript objects, providing schema, constraints, and ORM features.
+
+
+
+
+
+
+
+
+✅ Pagination + Search using Query Params (Proper Way)
+Example API call
+GET /users?page=1&limit=5&search=bini
+
+1️⃣ Create Query DTO (Best Practice)
+📄 users/dto/query-user.dto.ts
+import { IsOptional, IsInt, Min, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class QueryUserDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 10;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+
+✅ Validates query params
+✅ Converts string → number automatically
+✅ Clean controller
+
+2️⃣ Update Users Controller (Query Passing)
+📄 users.controller.ts
+import { Controller, Get, Query } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { QueryUserDto } from './dto/query-user.dto';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  // GET /users?page=1&limit=5&search=bini
+  @Get()
+  findAll(@Query() query: QueryUserDto) {
+    return this.usersService.findAll(query);
+  }
+}
+
+
+📌 @Query() automatically maps:
+
+?page=1&limit=5&search=bini
+↓
+QueryUserDto
+
+3️⃣ Update Users Service (Pagination + Search Logic)
+📄 users.service.ts
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { QueryUserDto } from './dto/query-user.dto';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+  ) {}
+
+  async findAll(query: QueryUserDto) {
+    const { page, limit, search } = query;
+    const skip = (page - 1) * limit;
+
+    const qb = this.userRepo.createQueryBuilder('user');
+
+    if (search) {
+      qb.where(
+        'user.name LIKE :search OR user.email LIKE :search',
+        { search: `%${search}%` },
+      );
+    }
+
+    const [data, total] = await qb
+      .skip(skip)
+      .take(limit)
+      .orderBy('user.createdAt', 'DESC')
+      .getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+}
+
+
+
+
+1️⃣ Method definition
+async findAll(page: number, limit: number, search?: string)
+
+
+async → because DB calls are asynchronous
+
+page → current page number (e.g. 1, 2, 3)
+
+limit → number of records per page
+
+search? → optional search text (name or email)
+
+Example call:
+
+GET /users?page=2&limit=5&search=bini
+
+2️⃣ Calculate how many records to skip
+const skip = (page - 1) * limit;
+
+
+This is offset pagination logic.
+
+Page	Limit	Skip
+1	5	0
+2	5	5
+3	5	10
+
+➡️ Page 2 skips first 5 records and fetches next 5.
+
+3️⃣ Create a QueryBuilder
+const query = this.userRepo.createQueryBuilder('user');
+
+
+Creates a TypeORM QueryBuilder
+
+'user' is a table alias
+
+Equivalent SQL start:
+
+SELECT * FROM users user
+
+
+Why QueryBuilder?
+✅ Dynamic conditions
+✅ Pagination
+✅ Search
+✅ Sorting
+
+4️⃣ Apply search condition (only if search exists)
+if (search) {
+
+
+Runs only when search is provided
+
+If not, returns all users
+
+5️⃣ Search by name OR email
+query.where(
+  'user.name LIKE :search OR user.email LIKE :search',
+
+
+SQL equivalent:
+
+WHERE user.name LIKE '%bini%'
+   OR user.email LIKE '%bini%'
+
+
+This allows:
+
+Search by name
+
+Search by email
+
+6️⃣ Safe parameter binding
+{ search: `%${search}%` }
+
+
+% → wildcard (contains search)
+
+Prevents SQL Injection
+
+TypeORM replaces :search safely
+
+7️⃣ Execute paginated query
+const [data, total] = await query
+  .skip(skip)
+  .take(limit)
+  .getManyAndCount();
+
+
+This line does everything 👇
+
+.skip(skip)
+OFFSET skip
+
+.take(limit)
+LIMIT limit
+
+.getManyAndCount()
+
+Runs two queries:
+1️⃣ Fetch paginated records → data
+2️⃣ Count total matching records → total
+
+Example:
+
+data  = [ {id: 6}, {id: 7}, {id: 8} ]
+total = 23
+
+8️⃣ Return structured response
+return {
+  data,
+  total,
+  page,
+  limit,
+  totalPages: Math.ceil(total / limit),
+};
+
+data
+
+➡️ Current page records
+
+total
+
+➡️ Total matching records (ignoring pagination)
+
+page
+
+➡️ Current page number
+
+limit
+
+➡️ Records per page
+
+totalPages
+Math.ceil(total / limit)
+
+
+Example:
+
+total = 23
+limit = 5
+totalPages = 5
+
+📦 Final API Response Example
+{
+  "data": [
+    { "id": 6, "name": "Bini", "email": "bini@test.com" }
+  ],
+  "total": 23,
+  "page": 2,
+  "limit": 5,
+  "totalPages": 5
+}
+
+
+
+
+4️⃣ Global Validation Pipe (Required)
+📄 main.ts
+app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true,
+    transform: true, // 🔥 enables query param conversion
+  }),
+);
+
+5️⃣ Example Responses
+Request
+GET /users?page=2&limit=3&search=test
+
+Response
+{
+  "data": [
+    {
+      "id": 4,
+      "name": "Test User",
+      "email": "test@mail.com"
+    }
+  ],
+  "meta": {
+    "total": 10,
+    "page": 2,
+    "limit": 3,
+    "totalPages": 4
+  }
+}
+
+
+
+
+
+@Query('page') page = 1,
+means “read the page value from the query string, and if it’s not provided, default it to 1.”
+
+Let’s break it down clearly 👇
+
+🔹 Piece-by-piece meaning
+1️⃣ @Query('page')
+Extracts the page query parameter from the URL.
+
+Example request:
+
+GET /users?page=3
+➡️ page will be "3" (string).
+
+2️⃣ page
+This is the method parameter name that will hold the value.
+
+3️⃣ = 1 (Default value)
+If the client does NOT send page, then:
+
+GET /users
+➡️ page becomes 1.
+
+So this line is equivalent to:
+
+const page = req.query.page ?? 1;
+🔹 Full example in controller
+@Get()
+findAll(
+  @Query('page') page = 1,
+  @Query('limit') limit = 10,
+) {
+  return { page, limit };
+}
+Requests & results
+Request	page	limit
+/users	1	10
+/users?page=2	"2"	10
+/users?page=2&limit=5	"2"	"5"
+⚠️ Values are strings unless transformed.
+
+🔹 Important ⚠️ (Type issue)
+Even if you write:
+
+@Query('page') page: number = 1
+page is still a string at runtime.
+
+✔ That’s why people do:
+
++page
+or use:
+
+@Query('page', ParseIntPipe) page: number = 1
+🔹 Better version (Recommended)
+@Get()
+findAll(
+  @Query('page', ParseIntPipe) page = 1,
+  @Query('limit', ParseIntPipe) limit = 10,
+) {}
+Now:
+
+"2" → 2
+
+Invalid values → 400 error
+
+
+
+
+
+SQL Injection is a security attack where an attacker inserts malicious SQL code into an application’s input so the database executes it unintentionally.
+
+In short 👇
+👉 User input changes the SQL query logic.
+
+🔥 Simple example (Vulnerable)
+
+Imagine this bad code ❌:
+
+const query = `
+  SELECT * FROM users
+  WHERE email = '${email}'
+  AND password = '${password}'
+`;
+
+Attacker input:
+email: admin@test.com
+password: ' OR '1'='1
+
+Final SQL becomes:
+SELECT * FROM users
+WHERE email = 'admin@test.com'
+AND password = '' OR '1'='1'
+
+
+👉 '1'='1' is always TRUE
+👉 Login bypassed
+👉 Attacker logs in as admin 😱
+
+🧨 Types of SQL Injection
+1️⃣ Authentication bypass
+' OR '1'='1 --
+
+2️⃣ Data theft
+' UNION SELECT * FROM users --
+
+3️⃣ Data deletion
+'; DROP TABLE users; --
+
+❌ Why it happens
+
+SQL Injection occurs when:
+
+User input is directly concatenated into SQL
+
+No validation or sanitization
+
+No parameter binding
+
+✅ Safe way (Parameterized Queries)
+TypeORM safe example ✅
+query.where(
+  'user.email LIKE :search',
+  { search: `%${search}%` },
+);
+
+
+Here:
+
+:search is a placeholder
+
+Actual value is bound safely
+
+DB treats it as data, not SQL
+
+🔐 Safe vs Unsafe (Side-by-side)
+❌ Unsafe	✅ Safe
+'${input}'	:param
+String concatenation	Parameter binding
+Easy to hack	Injection-proof
+Raw SQL	ORM / Prepared statements
+
+
+SQL Injection can:
+
+Steal user data
+
+Delete entire database
+
+Modify records
+
+Bypass authentication
+
+Cause financial & legal damage
+
+
+
+
+@Type(() => Number) comes from class-transformer and its job is to convert incoming values to a specific JavaScript type.
+
+In short 👇
+👉 It transforms a string into a number at runtime.
+
+🔹 Why is this needed?
+
+All query params come as strings.
+
+Example request:
+
+GET /users?page=2&limit=5
+
+
+Without transformation:
+
+page = "2"   // string
+limit = "5"  // string
+
+
+But pagination math needs numbers.
+
+🔹 What @Type(() => Number) does
+@Type(() => Number)
+page: number;
+
+
+It converts:
+
+"2" → 2
+"5" → 5
+
+🔹 Where it’s commonly used
+Query DTO example
+export class QueryUserDto {
+  @IsOptional()
+  @Type(() => Number)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  limit?: number = 10;
+}
+
+
+Now:
+
+page + 1   // works correctly
+
+🔹 Without @Type (Bug)
+"2" + 1 = "21" ❌
+"2" * 1 = 2    (hacky)
+
+🔹 With @Type (Correct)
+2 + 1 = 3 ✅
+
+🔹 Relationship with ValidationPipe
+
+To make @Type work, you MUST enable:
+
+app.useGlobalPipes(
+  new ValidationPipe({
+    transform: true, // 🔥 required
+  }),
+);
+
+
+Without transform: true, @Type() will not run.
+
+🔹 @Type vs ParseIntPipe
+@Type(() => Number)	ParseIntPipe
+Used in DTOs	Used in controller params
+Batch transform	Single param
+Clean for many params	Good for one param
+Works with validation	Controller-level
+🔹 What happens internally
+Request → Query string (string)
+        → class-transformer (@Type)
+        → DTO (number)
+        → Controller
