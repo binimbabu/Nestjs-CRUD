@@ -1,13 +1,5 @@
-Skip to content
-Chat history
+Controller → DTO Validation → Service → Repository → MySQL
 
-
-You said:
-Nest crud example step
-ChatGPT said:
-Below is a simple NestJS CRUD example – step by step 👍
-I’ll use a Users resource with Nest CLI + in-memory array first (easy to understand).
-At the end, I’ll also show how it looks with a database (TypeORM).
 
 1️⃣ Create a NestJS Project
 npm i -g @nestjs/cli
